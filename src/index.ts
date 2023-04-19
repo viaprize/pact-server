@@ -95,15 +95,16 @@ export class DB {
           const result = row as Pact
           if (!result) {
             resolve(null)
+          } else {
+            const pact = {
+              name: result.name,
+              terms: result.terms,
+              address: result.address,
+              transactionHash: result.transactionHash,
+              blockHash: result.blockHash
+            }
+            resolve(pact)
           }
-          const pact = {
-            name: result.name,
-            terms: result.terms,
-            address: result.address,
-            transactionHash: result.transactionHash,
-            blockHash: result.blockHash
-          }
-          resolve(pact)
         }
       })
     })
@@ -111,8 +112,6 @@ export class DB {
 
   async getPacts(): Promise<Pact[]> {
     return new Promise((resolve, reject) => {
-      console.log(statements.getPacts)
-
       this.db.all(statements.getPacts, (err, rows) => {
         if (err) {
           reject(err)
