@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@eth-optimism/common-ts": "^0.8.1",
-    "cors": "^2.8.5",
     "express": "^4.17.1",
     "sqlite3": "^5.1.6"
   }

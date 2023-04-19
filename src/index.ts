@@ -15,8 +15,6 @@ import path from 'path'
 import fs from 'fs'
 import { Request, Response } from 'express';
 
-const cors = require('cors')
-
 import { version } from '../package.json'
 
 // TODO: temp debugging
@@ -194,7 +192,11 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
 
   // all routes have /api prefix automatically
   async routes(router: ExpressRouter): Promise<void> {
-    router.use(cors())
+    router.use((_, res: Response, next) => {
+      res.header('Access-Control-Allow-Origin', '*')
+      res.header('Access-Control-Allow-Methods', 'GET,POST')
+      next()
+    })
 
     router.get('/status', async (_, res: Response) => {
       return res.status(200).json({
