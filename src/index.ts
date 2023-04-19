@@ -93,6 +93,9 @@ export class DB {
           reject(err)
         } else {
           const result = row as Pact
+          if (!result) {
+            resolve(null)
+          }
           const pact = {
             name: result.name,
             terms: result.terms,
