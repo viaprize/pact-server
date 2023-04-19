@@ -8,15 +8,24 @@ import {
 } from '@eth-optimism/common-ts'
 import { getChainId } from '@eth-optimism/core-utils'
 import { Provider } from '@ethersproject/abstract-provider'
-import { ethers, Transaction } from 'ethers'
-
+import sqlite3 from 'sqlite3'
+import { statements } from './sql'
+import os from 'os'
+import path from 'path'
+import fs from 'fs'
 import { Request, Response } from 'express';
 
+const cors = require('cors')
+
 import { version } from '../package.json'
+
+// TODO: temp debugging
+sqlite3.verbose()
 
 type Options = {
   rpcProvider: Provider
   pactFactoryAddress: string
+  dbPath: string
 }
 
 type Metrics = {
@@ -37,19 +46,70 @@ type Pact = {
 }
 
 // In memory database, not real
-class DB {
-  private db: { [key: string]: Pact }
+export class DB {
+  private db: sqlite3.Database
 
-  constructor() {
-    this.db = {}
+  constructor(path: string) {
+    if (path === '') {
+      path = ':memory:'
+    }
+    this.db = new sqlite3.Database(path)
   }
 
-  async get(key: string): Promise<Pact> {
-    return this.db[key]
+  async init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(statements.createTable, (err) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve()
+        }
+      })
+    })
   }
 
-  async set(key: string, value: any): Promise<void> {
-    this.db[key] = value
+  async setPact(pact: Pact): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(statements.insertPact, {
+        $name: pact.name,
+        $terms: pact.terms,
+        $address: pact.address,
+        $transactionHash: pact.transactionHash,
+        $blockHash: pact.blockHash
+      }, (err) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve()
+        }
+      })
+    })
+  }
+
+  async getPact(address: string): Promise<Pact> {
+    return new Promise((resolve, reject) => {
+      this.db.get(statements.getPact, {
+        $address: address
+      }, (err, row) => {
+        if (err) {
+          reject(err)
+        } else {
+          const result = row as Pact
+          const pact = {
+            name: result.name,
+            terms: result.terms,
+            address: result.address,
+            transactionHash: result.transactionHash,
+            blockHash: result.blockHash
+          }
+          resolve(pact)
+        }
+      })
+    })
+  }
+
+  async close(): Promise<void> {
+    this.db.close()
   }
 }
 
@@ -71,7 +131,12 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
         pactFactoryAddress: {
           validator: validators.str,
           desc: 'Address of the PactFactory contract',
-        }
+        },
+        dbPath: {
+          validator: validators.str,
+          desc: 'Path to the database',
+          default: path.join(os.homedir(), '.pact-indexer', 'db'),
+        },
       },
       metricsSpec: {
         blockTipNumber: {
@@ -90,7 +155,13 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
       name: 'rpc-provider',
     })
 
-    this.state.db = new DB()
+    const dirname = path.dirname(this.options.dbPath)
+    if (!fs.existsSync(dirname)) {
+      fs.mkdirSync(dirname, { recursive: true })
+    }
+
+    this.state.db = new DB(this.options.dbPath)
+    await this.state.db.init()
 
     const chainId = await getChainId(this.options.rpcProvider)
     this.logger.info(`Pact factory address: ${this.options.pactFactoryAddress}`)
@@ -99,6 +170,8 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
 
   // all routes have /api prefix automatically
   async routes(router: ExpressRouter): Promise<void> {
+    router.use(cors())
+
     router.get('/status', async (_, res: Response) => {
       return res.status(200).json({
         ok: true
@@ -126,13 +199,13 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
       // The backend can also wait for the receipt so that the frontend doesn't
       // need to wait until the pact is created before it can be saved in the db
 
-      await this.state.db.set(pact.address, pact)
+      await this.state.db.setPact(pact)
       res.status(200).json()
     })
 
     router.get('/pact', async (req: Request, res: Response) => {
       const address = req.query.address as string
-      const pact = await this.state.db.get(address)
+      const pact = await this.state.db.getPact(address)
       if (!pact) {
         res.status(404).json()
         return
