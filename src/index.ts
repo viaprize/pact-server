@@ -37,7 +37,7 @@ type State = {
   db: DB
 }
 
-type Pact = {
+export type Pact = {
   name: string
   terms: string
   address: string
@@ -103,6 +103,30 @@ export class DB {
             blockHash: result.blockHash
           }
           resolve(pact)
+        }
+      })
+    })
+  }
+
+  async getPacts(): Promise<Pact[]> {
+    return new Promise((resolve, reject) => {
+      console.log(statements.getPacts)
+
+      this.db.all(statements.getPacts, (err, rows) => {
+        if (err) {
+          reject(err)
+        } else {
+          const pacts: Pact[] = []
+          for (const row of (rows as Pact[])) {
+            pacts.push({
+              name: row.name,
+              terms: row.terms,
+              address: row.address,
+              transactionHash: row.transactionHash,
+              blockHash: row.blockHash
+            })
+          }
+          resolve(pacts)
         }
       })
     })
@@ -211,6 +235,11 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
         return
       }
       res.status(200).json(pact)
+    })
+
+    router.get('/pacts', async (_, res: Response) => {
+      const pacts = await this.state.db.getPacts()
+      res.status(200).json(pacts)
     })
   }
 

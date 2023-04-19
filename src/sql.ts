@@ -15,5 +15,8 @@ export const statements = {
   `,
   getPact: `
   SELECT * FROM pacts WHERE address = $address;
-  `
+  `,
+  getPacts: `
+  SELECT * FROM pacts;
+  `,
 }

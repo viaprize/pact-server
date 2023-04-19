@@ -14,6 +14,7 @@ THIS HAS AN IN MEMORY DATABASE. DO NOT RESTART SERVER FOR NOW
 ## API
 
 - `GET /api/pact`
+- `GET /api/pacts`
 - `POST /api/pact`
 
 ## Roadmap
