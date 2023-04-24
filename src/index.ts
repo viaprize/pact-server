@@ -196,6 +196,7 @@ export class Server extends BaseServiceV2<Options, Metrics, State> {
   async routes(router: ExpressRouter): Promise<void> {
     router.use((_, res: Response, next) => {
       res.header('Access-Control-Allow-Origin', '*')
+      res.header('Access-Control-Allow-Headers', '*')
       res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
       next()
     })
